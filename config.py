@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from azure.keyvault.secrets import SecretClient
 
-load_dotenv(dotenv_path="./prod.env")
+load_dotenv(dotenv_path="./app.env")
 key_vault_uri = "https://{}.vault.azure.net/".format(os.getenv("SECRET_VAULT"))
 credential = DefaultAzureCredential()
 if os.getenv("APP_LOCATION") == "Azure":
