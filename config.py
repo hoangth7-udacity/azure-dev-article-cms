@@ -3,8 +3,8 @@ from dotenv import load_dotenv
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 
-load_dotenv()
-key_vault_uri = "https://{}.vault.azure.net/".format(os.environ.get("SECRET_VAULT"))
+load_dotenv(dotenv_path="./prod.env")
+key_vault_uri = "https://{}.vault.azure.net/".format(os.getenv("SECRET_VAULT"))
 credential = DefaultAzureCredential()
 secret_client = SecretClient(vault_url=key_vault_uri, credential=credential)
 
@@ -13,18 +13,30 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 class Config(object):
     ### secret key for CSRF
-    SECRET_KEY = secret_client.get_secret("secret-key").value or "secret-key"
+    SECRET_KEY = secret_client.get_secret("secret-key").value
+    if not SECRET_KEY:
+        raise ValueError("Need to define SECRET_KEY environment variable")
 
     # storage account
     BLOB_ACCOUNT = os.environ.get("BLOB_ACCOUNT")
     BLOB_STORAGE_KEY = secret_client.get_secret("blob-storage-key").value
-    BLOB_CONTAINER = os.environ.get("BLOB_CONTAINER")
+    if not BLOB_ACCOUNT or not BLOB_STORAGE_KEY or not BLOB_CONTAINER:
+        raise ValueError("Need to define blob storage config")
+
     # database server
     SQL_SERVER = os.environ.get("SQL_SERVER")
     SQL_SERVER_PORT = os.environ.get("SQL_SERVER_PORT", "1433")
     SQL_DATABASE = os.environ.get("SQL_DATABASE")
     SQL_USER_NAME = os.environ.get("SQL_USER_NAME")
     SQL_PASSWORD = secret_client.get_secret("sql-password").value
+    if (
+        not SQL_SERVER
+        or not SQL_SERVER_PORT
+        or not SQL_DATABASE
+        or not SQL_USER_NAME
+        or not SQL_PASSWORD
+    ):
+        raise ValueError("Need to define database config")
     # Below URI may need some adjustments for driver version, based on your OS, if running locally
     SQLALCHEMY_DATABASE_URI = (
         "mssql+pyodbc://"
