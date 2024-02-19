@@ -2,13 +2,11 @@ from datetime import datetime
 from FlaskWebProject import app, db, login
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
-from azure.storage.blob import BlockBlobService
+from azure.storage.blob import BlobServiceClient
+from azure.core.exceptions import ResourceNotFoundError
 import string, random
-from werkzeug import secure_filename
+from werkzeug.utils import secure_filename
 from flask import flash
-
-blob_container = app.config['BLOB_CONTAINER']
-blob_service = BlockBlobService(account_name=app.config['BLOB_ACCOUNT'], account_key=app.config['BLOB_STORAGE_KEY'])
 
 def id_generator(size=32, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
@@ -53,14 +51,24 @@ class Post(db.Model):
 
         if file:
             filename = secure_filename(file.filename);
-            fileextension = filename.rsplit('.',1)[1];
-            Randomfilename = id_generator();
-            filename = Randomfilename + '.' + fileextension;
+            file_extension = filename.rsplit('.',1)[1];
+            random_filename = id_generator();
+            filename = random_filename + '.' + file_extension;
             try:
-                blob_service.create_blob_from_stream(blob_container, filename, file)
+                blob_service_client = BlobServiceClient(
+                    account_url=f"https://{app.config['BLOB_ACCOUNT']}.blob.core.windows.net",
+                    credential=app.config['BLOB_STORAGE_KEY']
+                )
+                blob_container_client = blob_service_client.get_container_client(container=app.config['BLOB_CONTAINER'])
+                blob_client = blob_container_client.get_blob_client(filename)
+                blob_client.upload_blob(file)
                 if(self.image_path):
-                    blob_service.delete_blob(blob_container, self.image_path)
-            except Exception:
+                    blob_client = blob_container_client.get_blob_client(self.image_path)
+                    blob_client.delete_blob()
+            except ResourceNotFoundError as e:
+                app.logger.warn(f"Blob not found: {self.image_path} - Error: {e}")
+            except Exception as e:
+                app.logger.error("failed when uploading image to blob storage, error: %s", str(e))
                 flash(Exception)
             self.image_path =  filename
         if new:

@@ -31,7 +31,7 @@
         </div>
         <div class="col-sm-4">
             {% if form.image_path.data %}
-            <p><img src="{{ imageSource + form.image_path.data }}" width="250" height="250" /></p>
+            <p><img src="{{ imageSource }}" alt="article image" style="max-height: 450px; max-width: 100%; display: block; margin-left: auto; margin-right: auto;" /></p>
             {% endif %}
             <p>
                 {{ form.image_path.label }}<br>

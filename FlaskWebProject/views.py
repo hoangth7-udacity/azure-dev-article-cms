@@ -2,7 +2,6 @@
 Routes and views for the flask application.
 """
 
-from datetime import datetime
 from flask import render_template, flash, redirect, request, session, url_for
 from werkzeug.urls import url_parse
 from config import Config
@@ -10,8 +9,12 @@ from FlaskWebProject import app, db
 from FlaskWebProject.forms import LoginForm, PostForm
 from flask_login import current_user, login_user, logout_user, login_required
 from FlaskWebProject.models import User, Post
+from azure.storage.blob import generate_blob_sas
+from azure.core.exceptions import ResourceNotFoundError
+
 import msal
 import uuid
+import datetime
 
 imageSourceUrl = 'https://'+ app.config['BLOB_ACCOUNT']  + '.blob.core.windows.net/' + app.config['BLOB_CONTAINER']  + '/'
 
@@ -48,13 +51,15 @@ def new_post():
 def post(id):
     post = Post.query.get(int(id))
     form = PostForm(formdata=request.form, obj=post)
+
+    sas_token = _generate_sas_token(form.image_path.data)
     if form.validate_on_submit():
         post.save_changes(form, request.files['image_path'], current_user.id)
         return redirect(url_for('home'))
     return render_template(
         'post.html',
         title='Edit Post',
-        imageSource=imageSourceUrl,
+        imageSource=f'{imageSourceUrl}{form.image_path.data}?{sas_token}',
         form=form
     )
 
@@ -85,8 +90,10 @@ def authorized():
         return render_template("auth_error.html", result=request.args)
     if request.args.get('code'):
         cache = _load_cache()
-        # TODO: Acquire a token from a built msal app, along with the appropriate redirect URI
-        result = None
+        result = _build_msal_app(cache=cache).acquire_token_by_authorization_code(
+            request.args['code'],
+            scopes=Config.SCOPE,
+            redirect_uri=url_for('authorized', _external=True, _scheme='https'))
         if "error" in result:
             return render_template("auth_error.html", result=result)
         session["user"] = result.get("id_token_claims")
@@ -111,18 +118,42 @@ def logout():
     return redirect(url_for('login'))
 
 def _load_cache():
-    # TODO: Load the cache from `msal`, if it exists
-    cache = None
+    cache = msal.SerializableTokenCache()
+    if session.get('token_cache'):
+        cache.deserialize(session['token_cache'])
     return cache
 
 def _save_cache(cache):
-    # TODO: Save the cache, if it has changed
-    pass
+    if cache.has_state_changed:
+        session['token_cache'] = cache.serialize()
 
 def _build_msal_app(cache=None, authority=None):
-    # TODO: Return a ConfidentialClientApplication
-    return None
+    return msal.ConfidentialClientApplication(
+        Config.CLIENT_ID, authority=authority or Config.AUTHORITY,
+        client_credential=Config.CLIENT_SECRET, token_cache=cache)
 
 def _build_auth_url(authority=None, scopes=None, state=None):
-    # TODO: Return the full Auth Request URL with appropriate Redirect URI
-    return None
+    return _build_msal_app(authority=authority).get_authorization_request_url(
+        scopes or [],
+        state=state or str(uuid.uuid4()),
+        redirect_uri=url_for('authorized', _external=True, _scheme='https'))
+
+def _generate_sas_token(blob_name):
+    try:
+        sas_token = generate_blob_sas(
+            account_name=app.config['BLOB_ACCOUNT'],
+            container_name=app.config['BLOB_CONTAINER'],
+            blob_name=blob_name,
+            account_key=app.config['BLOB_STORAGE_KEY'],
+            permission="r",  # Read permission
+            expiry=datetime.datetime.utcnow() + datetime.timedelta(hours=1)  # Expiry time
+        )
+        return sas_token
+
+    except ResourceNotFoundError as e:
+        app.logger.error(f"Blob not found: {blob_name} - Error: {e}")
+        return None
+
+    except Exception as e:  # General catch-all
+        app.logger.error(f"Error generating SAS token: {e}")
+        return None
