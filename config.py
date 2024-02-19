@@ -23,6 +23,7 @@ class Config(object):
     # storage account
     BLOB_ACCOUNT = os.environ.get("BLOB_ACCOUNT")
     BLOB_STORAGE_KEY = secret_client.get_secret("blob-storage-key").value
+    BLOB_CONTAINER = os.getenv("BLOB_CONTAINER")
     if not BLOB_ACCOUNT or not BLOB_STORAGE_KEY or not BLOB_CONTAINER:
         raise ValueError("Need to define blob storage config")
 
