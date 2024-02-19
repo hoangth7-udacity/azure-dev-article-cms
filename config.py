@@ -1,11 +1,14 @@
 import os
 from dotenv import load_dotenv
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from azure.keyvault.secrets import SecretClient
 
 load_dotenv(dotenv_path="./prod.env")
 key_vault_uri = "https://{}.vault.azure.net/".format(os.getenv("SECRET_VAULT"))
 credential = DefaultAzureCredential()
+if os.getenv("APP_LOCATION") == "Azure":
+    print("Using Managed Identity")
+    credential = ManagedIdentityCredential()
 secret_client = SecretClient(vault_url=key_vault_uri, credential=credential)
 
 basedir = os.path.abspath(os.path.dirname(__file__))
