@@ -1,9 +1,11 @@
 {
     "python.defaultInterpreterPath": "D:\\Dev\\python\\envs\\venv_3.7\\python.exe",
     "cSpell.words": [
+        "dbadmin",
         "formdata",
         "pyodbc",
         "SQLALCHEMY",
+        "udacityarticlecms",
         "udaz",
         "udazdev",
         "unixodbc",

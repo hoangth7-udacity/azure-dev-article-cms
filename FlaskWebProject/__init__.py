@@ -1,6 +1,7 @@
 """
 The flask application package.
 """
+
 import logging
 from flask import Flask
 from config import Config
@@ -17,6 +18,6 @@ app.logger.addHandler(handler)
 Session(app)
 db = SQLAlchemy(app)
 login = LoginManager(app)
-login.login_view = 'login'
+login.login_view = "login"
 
 import FlaskWebProject.views
